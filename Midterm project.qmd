@@ -6,23 +6,364 @@ editor: visual
 embed-resources: true
 ---
 
-## Quarto
+## Introduction
 
-Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
+The dataset Nutrition, Physical Activity, and Obesity, was acquired from the Centers for Disease Control and Prevention through the Youth Risk Behavior Surveillance System. In this dataset, there is information on high school students in grades 9-12 from public and private schools regarding their diet, physical activity, and weight. This data helps inform the Division of Nutrition, Physical Activity, and Obesity which in turn contributes to national and state data on these markers.
 
-## Running Code
+The question I will be exploring and analyzing is "Does the class pertaining to obesity/weight status differ by state and/or ethnicity?"
 
-When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
+## Methods
 
-```{r}
-1 + 1
+The data were acquired from the Youth Risk Behavior Surveillance System where surveys were given to national, state, territorial, tribal, and large urban schools from grades 9-12 in U.S. high schools. Students were randomly selected to participate based on their required classes or a specific period of the school day. I used the API pertaining to the data but had to modify the default limit to allow all 44,702 observations and 31 columns to allow for all data to show.
+
+I assessed missing values for the key variables which included:locationdesc, geolocation, data_value, race_ethnicity, and class. I then filtered the dataset for only relevant class observations including "Obesity/Weight Status." To better visualize and compare data, I transformed the variable "question" into a binary variable where 1 = "Percent of students in grades 9-12 who have an overweight classification" and 2 = "Percent of students in grades 9-12 who have obesity."
+
+For exploratory data analysis, I used ggplots and bar plots to assess individual variables and explore their distribution. From here I discovered that the questions had equal counts, NY had the highest data value counts, and the race/ethnicity that was most common in this sample was Non-Hispanic White individuals.
+
+```{r include = FALSE}
+library(httr)
+library(readr)
+url <- "https://data.cdc.gov/resource/vba9-s8jp.csv" # API endpoint
+
+all_data <- list()
+limit <- 50000  # Modifying the default limit
+response <- GET(paste0(url, "?$limit=", limit))
+
+csv_content <- content(response, as = "text")
+data <- read_csv(csv_content)
+print(data)
 ```
 
-You can add options to executable code like this
-
-```{r}
-#| echo: false
-2 * 2
+```{r include = FALSE}
+#checking structure of dataset 
+str(data)
 ```
 
-The `echo: false` option disables the printing of code (only output is displayed).
+```{r include = FALSE}
+# Checking key variables more closely
+mean(is.na(data$locationdesc))
+```
+
+```{r include = FALSE}
+mean(is.na(data$geolocation))
+```
+
+```{r include = FALSE}
+data <- data[!is.na(data$geolocation), ]
+mean(is.na(data$geolocation))
+```
+
+```{r include = FALSE}
+mean(is.na(data$data_value))
+```
+
+```{r include = FALSE}
+mean(is.na(data$race_ethnicity))
+```
+
+```{r include = FALSE}
+data <- data[!is.na(data$race_ethnicity), ]
+# Making sure that NA values were removed
+mean(is.na(data$race_ethnicity))
+```
+
+```{r include = FALSE}
+mean(is.na(data$class))
+```
+
+```{r include = FALSE}
+# Keeping only the variable in question from the Class column
+library(dplyr)
+data <- data |>
+filter(class == "Obesity / Weight Status")
+print(data)
+```
+
+```{r include = FALSE}
+# code the questions as 1 or 2 
+library(dplyr)
+data <- data |>
+  mutate(questions_coded = case_when(
+    question == "Percent of students in grades 9-12 who have an overweight classification" ~ 1,
+    question == "Percent of students in grades 9-12 who have obesity" ~ 2,
+    TRUE ~ NA_real_  # Assign NA for other cases
+  ))
+```
+
+```{r}
+# Exploring individual variables 
+library(ggplot2)
+ggplot(data, aes(x = factor(questions_coded))) + 
+  geom_bar() + 
+  theme_minimal()
+
+```
+
+```{r}
+library(ggplot2)
+ggplot(data, aes(x = factor(locationabbr))) + 
+  geom_bar(width = 0.5) + 
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+# looking at distribution of ethicity
+ggplot(data, aes(x = factor(race_ethnicity))) + 
+  geom_bar() + 
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+## Preliminary Results
+
+To help with data visualization, I separated states into regions pertaining to Northeast, Midwest, South, and West. From here, I was able to create a bar plot with the average data values according to Question 1 and Question 2 stratified by region. This visual helped in determining the first part of my question if obesity/weight status differed by state. To help answer the second part of my question, I created another bar plot of average data value by race/ethnicity and question. For the creation of maps to help visualize the association, I first separated and cleaned the geolocation variable into latitude and longitude columns. I created a preliminary visual map distribution of where the surveys were administered in the U.S. high schools. I created summary statistics in tabular form of race/ethnicity by question 1 and question 2 where 2 or more races, Asian, Hispanic, Non-Hispanic Black, and Non-Hispanic White had higher mean data values for Question 1. American Indian/Alaska Native and Hawaiian/Pacific Islander had higher mean data values for question 2.
+
+To create a final representation to help answer my question, I filtered the data to include Question 1 and Question 2 separately. I then created separate maps to visualize the distribution of ethnicity/race and mean data values of the questions separately. By doing this, I could interact with the map and compare the mean data values (in percent) of how obesity/weight status differed by location and by race/ethnicity. The average data value percentage of obesity/weight for Question 1 was of 17.62% in the following locations: Alaska, South Carolina, North Carolina, Georgia, Michigan, and Wyoming. The race/ethnicity in all these locations was American Indian/Alaska Native. For Question 2, the percentage of obesity/weight status was again 17.62% which was the highest in North Dakota and Alaska. The ethnicity were also American Indian/Alaska Native.
+
+```{r include = FALSE}
+# Separate state by region to make visualizations clearer
+state_to_region <- data.frame(
+  locationdesc = c(
+    "District of Columbia",  
+    "Connecticut", "Maine", "Massachusetts", "New Hampshire", "New Jersey", 
+    "New York", "Pennsylvania", "Rhode Island", "Vermont",
+    "Illinois", "Indiana", "Iowa", "Kansas", "Michigan", 
+    "Minnesota", "Missouri", "Nebraska", "North Dakota", 
+    "Ohio", "South Dakota", "Wisconsin",
+    "Alabama", "Arkansas", "Delaware", "Florida", "Georgia", 
+    "Kentucky", "Louisiana", "Maryland", "Mississippi", 
+    "North Carolina", "Oklahoma", "Puerto Rico", "South Carolina", "Tennessee", 
+    "Texas", "Virginia", "West Virginia",
+    "Alaska", "Arizona", "California", "Colorado", "Hawaii", 
+    "Idaho", "Montana", "Nevada", "New Mexico", 
+    "Oregon", "Utah", "Washington", "Wyoming",
+    "Virgin Islands",  
+    "Guam"  
+  ),
+  region = c(
+    rep("Northeast", 10),  
+    rep("Midwest", 12),    
+    rep("South", 19),      
+    rep("West", 13)        
+  )
+)
+
+```
+
+```{r include = FALSE}
+data_with_region <- merge(data, state_to_region, by = "locationdesc", all.x = TRUE)
+```
+
+```{r include = FALSE}
+# making sure I didn't miss any regions
+mean(is.na(data_with_region$region))
+```
+
+```{r}
+# Bar plot of average data value by region 
+ggplot(data_with_region, aes(x = region, y = data_value_alt, fill = question)) +
+  stat_summary(fun = mean, geom = "bar", position = "dodge", width = 0.7) +
+  stat_summary(fun.data = mean_se, geom = "errorbar", width = 0.2, 
+               position = position_dodge(0.7)) +
+  theme_minimal() +
+  labs(title = "Average Data Value by Region and Question",
+       x = "Region",
+       y = "Average Data Value") +
+   theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+```
+
+```{r}
+# Bar plot of average data value by ethnicity
+ggplot(data_with_region, aes(x = race_ethnicity, y = data_value_alt, fill = question)) +
+  stat_summary(fun = mean, geom = "bar", position = "dodge", width = 0.7) +
+  stat_summary(fun.data = mean_se, geom = "errorbar", width = 0.2, 
+               position = position_dodge(0.7)) +
+  theme_minimal() +
+  labs(title = "Average Data Value by Race and Question",
+       x = "Race/Ethnicity",
+       y = "Average Data Value") +
+   theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+```
+
+```{r include = FALSE}
+# Checking the format of geolocation
+print(data_with_region$geolocation)
+```
+
+```{r include = FALSE}
+library(tidyr)
+# Clean geolocation column to separate into longitude and latitude 
+data_with_region <- data_with_region |>
+  mutate(geolocation = gsub("[()]", "", geolocation),                
+         geolocation = gsub("\\n|\\s*,\\s*|\\s+", " ", geolocation), 
+         geolocation = trimws(geolocation)) |>                       
+  
+  separate(geolocation, into = c("latitude", "longitude"), sep = " ", fill = "right") |>
+  mutate(across(c(latitude, longitude), as.numeric))
+```
+
+```{r}
+# Visualizing distribution of where surveys were administered 
+library(leaflet)
+leaflet(data_with_region) |>
+  addTiles() |>  
+  addMarkers(
+    lng = ~longitude, 
+    lat = ~latitude, 
+    popup = ~as.character(locationdesc)  
+  )
+```
+
+```{r}
+leaflet(data_with_region) |>
+  addProviderTiles('CartoDB.Positron') |>
+  addCircles(
+    lat = ~latitude, 
+    lng = ~longitude, 
+    radius = 50000, 
+    color = ~case_when(
+      race_ethnicity == "2 or more races" ~ "red",
+      race_ethnicity == "American Indian/Alaska Native" ~ "blue",
+      race_ethnicity == "Asian" ~ "green",
+      race_ethnicity == "Hawaiian/Pacific Islander" ~ "purple",
+      race_ethnicity =="Hispanic" ~ "yellow",
+      race_ethnicity == "Non-Hispanic Black" ~ "pink",
+      race_ethnicity == "Non-Hispanic White" ~ "orange"
+   
+    ),
+    fillOpacity = 0.5,
+    popup = ~sprintf(
+      "<strong>State:</strong> %s<br>
+       <strong>Ethnicity:</strong> %s",
+      locationdesc, race_ethnicity
+    )
+  ) |>
+  addLegend(
+    position = "bottomright",
+    colors = c("red", "blue", "green","purple", "yellow", "pink", "orange"),
+    labels = c("2 or more races", "American Indian/Alaska Native", "Asian", "Hawaiian/Pacific Islander", "Hispanic", "Non-Hispanic Black", "Non-Hispanic White"),
+    title = "Ethnicities in each location"
+  )
+```
+
+```{r}
+library(knitr)
+summary_table <- data_with_region |>
+  group_by(race_ethnicity, questions_coded) |>
+  summarise(
+    Mean = mean(data_value, na.rm = TRUE),
+    Median = median(data_value, na.rm = TRUE),
+    Count = n(),
+    SD = sd(data_value, na.rm = TRUE),
+    .groups = 'drop'  # This prevents warnings about grouped data
+  )
+
+# Create a nice table with kable
+kable(summary_table, caption = "Summary Statistics by Race/Ethnicity and Question")
+```
+
+```{r include = FALSE}
+summary_table <- data_with_region |>
+  group_by(race_ethnicity) |>
+  summarise(
+    Mean = mean(data_value, na.rm = TRUE),
+    .groups = 'drop'
+  )
+
+data_with_region <- data_with_region |>
+  left_join(summary_table, by = "race_ethnicity")
+```
+
+```{r include = FALSE}
+# Filter data by question to create a more interpretable visual
+data_question1 <- data_with_region |>
+  filter(questions_coded == 1)
+```
+
+```{r}
+# Create a leaflet map for mean value Question 1 by race/ethnicity
+leaflet(data_question1) |>
+  addTiles() |>  # Add default OpenStreetMap tiles
+  addCircleMarkers(
+    ~longitude,
+    ~latitude,
+    radius = ~Mean * 0.5,  # Scale the radius by the mean value (adjust as necessary)
+    color = ~case_when(
+      race_ethnicity == "2 or more races" ~ "red",
+      race_ethnicity == "American Indian/Alaska Native" ~ "blue",
+      race_ethnicity == "Asian" ~ "green",
+      race_ethnicity == "Hawaiian/Pacific Islander" ~ "purple",
+      race_ethnicity == "Hispanic" ~ "yellow",
+      race_ethnicity == "Non-Hispanic Black" ~ "pink",
+      race_ethnicity == "Non-Hispanic White" ~ "orange",
+      
+    ),
+      fill = TRUE,  # Ensure fill is set to TRUE
+    fillOpacity = 0.5,  # Set desired fill opacity
+    stroke = TRUE,  # Ensure stroke is drawn
+    weight = 1,  # Set stroke weight
+    
+    popup = ~sprintf(
+      "<strong>locationdesc:</strong> %s<br>
+      <strong>Race/Ethnicity:</strong> %s<br>
+       <strong>Mean Value:</strong> %.2f",
+       
+  locationdesc, race_ethnicity, Mean 
+    
+    )
+  ) |> 
+  addLegend(
+    position = "bottomright",
+    colors = c("red", "blue", "green", "purple", "yellow", "pink", "orange"),  # Use c() to create a vector
+    labels = c("2 or more races", "American Indian/Alaska Native", "Asian", "Hawaiian/Pacific Islander", "Hispanic", "Non-Hispanic Black", "Non-Hispanic White"),
+    title = "Race/Ethnicity"
+  )
+```
+
+```{r include = FALSE}
+# Filter data by question 2 to create a more interpretable visual
+data_question2 <- data_with_region |>
+  filter(questions_coded == 2)
+```
+
+```{r}
+# Create a leaflet map for mean value Question 2 by race/ethnicity
+leaflet(data_question2) |>
+  addTiles() |>  # Add default OpenStreetMap tiles
+  addCircleMarkers(
+    ~longitude,
+    ~latitude,
+    radius = ~Mean * 0.5,  # Scale the radius by the mean value (adjust as necessary)
+    color = ~case_when(
+      race_ethnicity == "2 or more races" ~ "red",
+      race_ethnicity == "American Indian/Alaska Native" ~ "blue",
+      race_ethnicity == "Asian" ~ "green",
+      race_ethnicity == "Hawaiian/Pacific Islander" ~ "purple",
+      race_ethnicity == "Hispanic" ~ "yellow",
+      race_ethnicity == "Non-Hispanic Black" ~ "pink",
+      race_ethnicity == "Non-Hispanic White" ~ "orange"
+    ),  # Removed the trailing comma here
+    fill = TRUE,  # Ensure fill is set to TRUE
+    fillOpacity = 0.5,  # Set desired fill opacity
+    stroke = TRUE,  # Ensure stroke is drawn
+    weight = 1,  # Set stroke weight
+    
+    popup = ~sprintf(
+      "<strong>locationdesc:</strong> %s<br>
+      <strong>Race/Ethnicity:</strong> %s<br>
+      <strong>Mean Value:</strong> %.2f",
+      locationdesc, race_ethnicity, Mean  # Ensure Locationabbr is a valid column
+    )
+  ) |> 
+  addLegend(
+    position = "bottomright",
+    colors = c("red", "blue", "green", "purple", "yellow", "pink", "orange"),  # Use c() to create a vector
+    labels = c("2 or more races", "American Indian/Alaska Native", "Asian", "Hawaiian/Pacific Islander", "Hispanic", "Non-Hispanic Black", "Non-Hispanic White"),
+    title = "Race/Ethnicity and mean value for Question 2"
+  )
+```
+
+## Conclusion
+
+After exploratory data analysis and the creation of graphs, it appears that obesity/weight status is higher in the American Indian/Alaska Native population. This is true for Question 1 "Percent of students in grades 9-12 who have an overweight classification" and Question 2 "Percent of students in grades 9-12 who have obesity." However, there is a greater distribution of students falling into Question 1 category as seen in that more states had a higher percent mean value of this distribution compare to Question 2. This is also seen in the bar plot comparing average data values by region stratified by question 1 and 2. Question 1 appears to have a higher average data value than question 2 in all regions.
